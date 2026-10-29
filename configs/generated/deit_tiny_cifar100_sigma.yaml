@@ -1,0 +1,75 @@
+seed: 0
+mode: sigma_search
+
+data:
+  dataset: cifar100
+  root: ../datasets          # parent of cifar-100-python/, not .../cifar100
+  image_size: 224
+  download: false
+
+model:
+  name: deit_tiny_patch16_224
+  pretrained: false
+  local_pretrained_path: null
+
+# ---- the search -------------------------------------------------------------
+sigma_search:
+  # REAL boundaries go at these layers, permanently. This is NOT a placement
+  # search: the block compresses+quantizes even at sigma=0, so sigma cannot
+  # switch a layer off. Pick placements you actually intend to deploy.
+  # Boundaries compose in series -- keep this to 1-2 entries.
+  layers: [9]
+
+  sigma_init: 0.02           # start where your b6/b8 runs sat
+  sigma_max: 0.5             # upper bound; sigma = sigma_max * sigmoid(logit)
+
+  # THE SIGN MATTERS. L = L_task + lambda_sigma * sum_l sigma_l
+  #   negative -> rewards noise -> real accuracy/privacy tradeoff  (USE THIS)
+  #   positive -> both terms push sigma to 0 -> degenerate, no privacy
+  # Magnitude sets the tradeoff point: more negative = noisier = less accurate.
+  # Sweep it (-0.001, -0.01, -0.1) to trace the frontier.
+  lambda_sigma: -0.01
+
+  task_loss: cross_entropy   # or 'mse' for the Y - Y' variant
+
+# ---- the boundary block (its `sigma` here is IGNORED and overridden) ---------
+boundary:
+  module: residual_adapter
+  bottleneck_dim: 128
+  sigma: 0.02                # ignored -- LearnableSigmaBoundary replaces it
+  quant_bits: 8
+  power: 1.0
+  power_norm_mode: clip      # NOTE: 'clip' only scales loud samples DOWN, so
+                             # sigma's effective SNR varies per sample. Use
+                             # 'unit' if you want sigma to mean one fixed thing.
+  noise_in_eval: true
+  adapter_mlp_ratio: 2.0
+  adapter_gamma_init: 0.1
+  adapter_dropout: 0.0
+
+train:
+  epochs: 30
+  batch_size: 128
+  num_workers: 4
+  amp: true
+  grad_clip: 1.0
+  freeze_prefix: true        # same recipe as the deployed boundary fine-tune
+
+optimizer:
+  name: adamw
+  lr: 1.0e-04                # boundary weights / tail / head
+  weight_decay: 0.05
+  sigma_lr: 1.0e-02          # sigma's gradient is noisy (scaled by a random eps)
+  sigma_weight_decay: 0.0    # keep 0 -- see build_sigma_optimizer docstring
+
+scheduler:
+  name: cosine
+  eta_min: 1.0e-06
+
+checkpoint:
+  load: checkpoints/deit_tiny_cifar100_baseline_epoch49_acc0.8394.pt
+  out_dir: ./checkpoints
+  name: deit_tiny_cifar100_sigma_search
+  save_best: true
+
+sigma_out: ./search_results/sigma_search.json

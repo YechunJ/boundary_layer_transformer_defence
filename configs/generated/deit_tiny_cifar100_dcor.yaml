@@ -1,0 +1,69 @@
+seed: 0
+mode: gated_search_dcor
+
+data:
+  dataset: cifar100
+  root: ../datasets
+  image_size: 224
+  download: false
+
+model:
+  name: deit_tiny_patch16_224
+  pretrained: false
+
+boundary:
+  module: residual_adapter
+  bottleneck_dim: 32
+  sigma: 0.5
+  quant_bits: 8
+  power: 1.0
+  power_norm_mode: clip
+  noise_in_eval: true
+  adapter_mlp_ratio: 2.0
+  adapter_gamma_init: 0.1
+  adapter_dropout: 0.0
+
+search:
+  candidate_layers: [4, 5, 6, 7, 8, 9]
+  k_max: 4
+  alpha_init: 1.0
+  task_loss: cross_entropy
+  lambda_sparsity: 0.25
+
+  # ---- dCor privacy term (NoPeek). No attack, no iters, no lambda_tv. -------
+  mu_privacy: 1
+  r_mode: marginal        # marginal = -(dCor2(z_l,x) - dCor2(exposed_l,x)); raw = +dCor2
+  dcor_kind: u            # u = transmitted bottleneck (honest); or zout
+  dcor_estimator: classical       # u = unbiased U-statistic (n(n-3), U-centring);
+                          # classical = NoPeek Appendix B (n^2, double-centring, BIASED)
+  dcor_detach: false      # false: gradient reaches boundary weights (NoPeek Eq.1),
+                          #        but only matters if boundaries are unfrozen.
+                          #        In pure alpha-only search they are frozen, so
+                          #        this is effectively detached regardless.
+  # -------------------------------------------------------------------------
+
+optimizer:
+  name: adamw
+  lr: 1.0e-04
+  weight_decay: 0.05
+  alpha_lr: 1.0e-02
+  alpha_weight_decay: 0.0
+
+scheduler:
+  name: cosine
+  eta_min: 1.0e-06
+
+train:
+  epochs: 20
+  batch_size: 128
+  num_workers: 4
+  amp: true
+  grad_clip: 1.0
+
+checkpoint:
+  load: checkpoints/deit_tiny_cifar100_baseline_epoch49_acc0.8394.pt
+  out_dir: ./checkpoints
+  name: gated_dcor_deit_tiny_cifar100
+  save_best: true
+
+search_out: ./search_results/alpha_dcor_search.json

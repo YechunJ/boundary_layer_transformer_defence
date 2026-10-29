@@ -1,0 +1,52 @@
+seed: 0
+mode: gated_search
+data:
+  dataset: cifar100
+  root: ../datasets
+  image_size: 224
+  download: false
+model:
+  name: deit_tiny_patch16_224
+  pretrained: false
+  local_pretrained_path: null
+search:
+  candidate_layers: [6, 8, 9, 10]
+  k_max: 2
+  alpha_init: 1.0
+  lambda_sparsity: 0.01
+  task_loss: cross_entropy
+boundary:
+  module: residual_adapter
+  bottleneck_dim: 192
+  sigma: 0.02
+  quant_bits: 8
+  power: 1.0
+  power_norm_mode: clip
+  noise_in_eval: true
+  adapter_mlp_ratio: 2.0
+  adapter_gamma_init: 0.1
+  adapter_dropout: 0.0
+train:
+  epochs: 20
+  batch_size: 128
+  num_workers: 4
+  amp: true
+  grad_clip: 1.0
+  freeze_backbone: true
+  unfreeze_head: true
+optimizer:
+  name: adamw
+  lr: 1.0e-04
+  weight_decay: 0.05
+  alpha_lr: 1.0e-02
+  alpha_weight_decay: 0.0
+scheduler:
+  name: cosine
+  eta_min: 1.0e-06
+checkpoint:
+  load: checkpoints/deit_tiny_cifar100_baseline_epoch49_acc0.8394.pt
+  out_dir: ./checkpoints
+  name: deit_tiny_cifar100_gated_search
+  save_best: true
+search_out: ./search_results/alpha_search.json
+

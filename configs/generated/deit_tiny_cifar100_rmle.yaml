@@ -1,0 +1,94 @@
+seed: 0
+mode: gated_search_rmle
+
+data:
+  dataset: cifar100
+  root: ../datasets
+  image_size: 224
+  download: false
+
+model:
+  name: deit_tiny_patch16_224
+  pretrained: false
+  local_pretrained_path: null
+
+search:
+  candidate_layers: [2, 3, 4, 5, 6, 8, 9, 10, 11]
+  k_max: 4
+  #candidate_layers: [2]
+  #k_max: 1
+  alpha_init: 1.0
+  lambda_sparsity: 0.01
+  task_loss: cross_entropy
+
+  # ---- privacy term:  mu * sum_l alpha_l * SSIM_l -------------------------
+  # mu = 0.0 reproduces defense_training.py exactly (control run).
+  # Scale: SSIM is in [0,1] and lambda*|alpha| contributes ~0.01 per gate, so
+  # mu ~ 0.1-1.0 makes the privacy signal comparable to or stronger than the
+  # sparsity pull. Sweep it.
+  mu_privacy: 0.5
+
+  # ---- how s_l is computed from the SSIM measurements ---------------------
+  # All modes feed:  L += mu * sum_l alpha_l * s_l
+  # so positive s_l pushes a gate DOWN, negative s_l pushes it UP.
+  #
+  #   raw           s_l = + SSIM_u(l)
+  #                 1 attack/layer. Cheapest, but SSIM falls with depth on its
+  #                 own, so deep layers score well on depth rather than on
+  #                 block quality.
+  #
+  #   marginal      s_l = - ( SSIM_raw(l) - SSIM_u(l) )
+  #                 Same depth, block present vs absent. The depth trend
+  #                 cancels exactly; no spacing artefact; defined at every
+  #                 layer. 2 attacks/layer.
+  r_mode: marginal
+
+  # ---- rMLE attack settings (He et al. ACSAC'19, Algorithm 1) --------------
+  rmle_iters: 500        # paper: 500 shallow / 5000 deep. Cost is linear here.
+  rmle_lr: 1.0e-02       # paper's step size for shallow layers
+  rmle_lambda_tv: 9e1 # MUST BE TUNED. paper used 1e1 at ReLU22, 1e3 at
+                         # ReLU32 -- deeper layers need a stronger image prior.
+                         # Run --benchmark and sweep 1e0/1e1/1e2/1e3.
+  probe_batch: 8         # images attacked per measurement (fixed set)
+  refresh_every: 5       # re-measure every N epochs; cached in between
+  # -------------------------------------------------------------------------
+
+boundary:
+  module: residual_adapter
+  bottleneck_dim: 32
+  sigma: 0.5
+  quant_bits: 8
+  power: 1.0
+  power_norm_mode: clip
+  noise_in_eval: true
+  adapter_mlp_ratio: 2.0
+  adapter_gamma_init: 0.1
+  adapter_dropout: 0.0
+
+train:
+  epochs: 20
+  batch_size: 128
+  num_workers: 4
+  amp: true
+  grad_clip: 1.0
+  freeze_backbone: true
+  unfreeze_head: true
+
+optimizer:
+  name: adamw
+  lr: 1.0e-04
+  weight_decay: 0.05
+  alpha_lr: 1.0e-02
+  alpha_weight_decay: 0.0
+
+scheduler:
+  name: cosine
+  eta_min: 1.0e-06
+
+checkpoint:
+  load: checkpoints/deit_tiny_cifar100_baseline_epoch49_acc0.8394.pt
+  out_dir: ./checkpoints
+  name: deit_tiny_cifar100_gated_rmle
+  save_best: true
+
+search_out: ./search_results/alpha_rmle_search.json

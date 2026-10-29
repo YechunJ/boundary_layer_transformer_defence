@@ -1,0 +1,76 @@
+# Multi-placement deployment config.
+#
+# Everything here is a knob. The only structural difference from the
+# single-boundary config used by train_deit_boundary_new_boundaries.py is that
+# `after_block: <int>` becomes `after_blocks: [<int>, ...]`. Every other field
+# has the same meaning and the same effect.
+#
+# Nothing about the placement or the strength is baked into a filename: the
+# checkpoint name is derived from this config at runtime (see auto_ckpt_name).
+# Leave checkpoint.name as null to get that; set it to override.
+
+seed: 0
+mode: multi_boundary_deploy
+
+data:
+  dataset: cifar100
+  root: ../datasets
+  image_size: 224
+  download: false
+
+model:
+  name: deit_tiny_patch16_224
+  pretrained: false
+  local_pretrained_path: null
+
+boundary:
+  # ---- PLACEMENT: any number of layers, any positions in [0, num_blocks] ----
+  # 0 = before block 1;  6 = after the 6th transformer block.
+  # One layer behaves exactly like the single-boundary trainer.
+  # Override without editing this file:  --after-blocks 3 7 11
+  after_blocks: [6, 9]
+
+  # ---- MECHANISM: any module build_boundary_module supports --------------
+  module: residual_adapter        # linear_noise | token_mix | cls_preserving |
+                                  # residual_adapter | ... (whatever your
+                                  # build_boundary_module dispatches on)
+  bottleneck_dim: 32             # D'
+  sigma: 0.5               # noise level
+  quant_bits: 8
+  power: 1.0
+  power_norm_mode: clip
+  noise_in_eval: true
+
+  # residual_adapter-specific; ignored by modules that do not use them
+  adapter_mlp_ratio: 8
+  adapter_gamma_init: 2
+  adapter_dropout: 0.0
+
+train:
+  epochs: 50
+  batch_size: 128
+  num_workers: 4
+  amp: true
+  grad_clip: 1.0
+  # Mirrors the single-boundary rule ("train the tail after the boundary"),
+  # generalised: freeze up to the EARLIEST boundary, train everything after it.
+  # false -> train the whole network end to end.
+  freeze_before_first: false
+
+optimizer:
+  name: adamw
+  lr: 1.0e-04
+  weight_decay: 0.05
+
+scheduler:
+  name: cosine
+  eta_min: 1.0e-06
+
+checkpoint:
+  load: checkpoints/deit_tiny_cifar100_baseline_epoch49_acc0.8394.pt
+  out_dir: ./checkpoints
+  name: null                      # null -> auto-derived from this config
+  save_best: true
+  save_last: true
+
+train_out: null                   # null -> auto-derived alongside the checkpoint

@@ -1,0 +1,55 @@
+# Python intermediate
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+
+# Datasets (normally ../datasets, but never commit data if it lands here)
+datasets/
+data/
+
+# Checkpoints and pretrained weights
+checkpoints/
+pretrained/
+*.pt
+*.pth
+*.ckpt
+*.pkl
+*.safetensors
+*.bin
+
+# Training outputs: dumped features, result JSONs, spreadsheets, figures
+features/
+search_results/
+/best
+*.xlsx
+*.csv
+*.npy
+*.npz
+*.png
+*.jpg
+*.pdf
+*.gif
+
+# Generated Slurm job scripts (re-create with sub_job_new_boundaries.py)
+jobs/
+
+# Run logs
+*.txt
+!requirements.txt
+*.out
+*.err
+*.log
+
+# Experiment trackers
+wandb/
+runs/
+outputs/
+multirun/
+lightning_logs/
+
+# Misc
+.ipynb_checkpoints/
+.DS_Store
+*.nfs*

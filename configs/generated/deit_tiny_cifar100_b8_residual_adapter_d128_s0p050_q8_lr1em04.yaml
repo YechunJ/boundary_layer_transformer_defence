@@ -1,0 +1,50 @@
+seed: 0
+mode: boundary
+data:
+  dataset: cifar100
+  root: ../datasets
+  image_size: 224
+  download: false
+model:
+  name: deit_tiny_patch16_224
+  pretrained: false
+  local_pretrained_path: null
+boundary:
+  enabled: true
+  after_block: 8
+  module: residual_adapter
+  bottleneck_dim: 128
+  sigma: 0.05
+  quant_bits: 8
+  power: 1.0
+  power_norm_mode: clip
+  noise_in_eval: true
+  adapter_mlp_ratio: 2.0
+  adapter_gamma_init: 0.1
+  adapter_dropout: 0.0
+train:
+  epochs: 50
+  batch_size: 128
+  num_workers: 4
+  amp: true
+  grad_clip: 1.0
+  freeze_prefix: true
+  unfreeze_tail: true
+  unfreeze_head: true
+  unfreeze_boundary: true
+optimizer:
+  name: adamw
+  lr: 0.0001
+  weight_decay: 0.05
+scheduler:
+  name: cosine
+  eta_min: 1.0e-06
+checkpoint:
+  load: checkpoints/deit_tiny_cifar100_baseline_epoch49_acc0.8394.pt
+  out_dir: ./checkpoints
+  name: deit_tiny_cifar100_b8_residual_adapter_d128_s0p050_q8_lr1em04
+  save_best: true
+dump_features:
+  enabled: true
+  path: ./features/deit_tiny_cifar100_b8_residual_adapter_d128_s0p050_q8_lr1em04.pt
+  max_batches: 20
